@@ -3,4 +3,4 @@
 Cuadernos disponibles:
 
 - [Fuentes geoespaciales (formato Markdown)](fuentes-geoespaciales.md)
-- [Fuentes geoespaciales (formato HTML)](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)
+- [Fuentes geoespaciales (formato HTML, quizá más legible)](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)

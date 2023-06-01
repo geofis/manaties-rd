@@ -31,6 +31,9 @@ knitr::opts_chunk$set(
 options(knitr.duplicate.label = "allow")
 ```
 
+
+`r if(!knitr::is_html_output()) 'Versión HTML (más legible e interactiva), [aquí](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)'`
+
 `r if(knitr::opts_knit$get("rmarkdown.pandoc.to") == 'gfm-yaml_metadata_block') 'Versión HTML (más legible e interactiva), [aquí](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)'`
 
 `r if(knitr::opts_knit$get("rmarkdown.pandoc.to") == 'latex') 'Versión HTML (quizá más legible), [aquí](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)'`
