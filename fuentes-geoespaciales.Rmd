@@ -1,0 +1,218 @@
+---
+title: "Análisis de idoneidad de hábitat para manatíes utilizando el proceso analítico jerárquico y técnicas geoespaciales. Fuentes geoespaciales"
+author: ""
+output:
+  # bookdown::github_document2:
+  #   number_sections: false
+  #   fig_caption: yes
+  bookdown::html_document2:
+    number_sections: false
+    code_folding: hide
+    fig_caption: yes
+    md_extensions: "-fancy_lists"
+editor_options: 
+  chunk_output_type: console
+always_allow_html: true
+references: ref/biblio.bib
+bibliography: ref/biblio.bib
+lang: 'es-DO'
+---
+
+```{r supsetup, include=FALSE}
+knitr::opts_chunk$set(
+  cache = F, 
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  out.width = '80%',
+  fig.align = 'center',
+  dpi = 300)
+# options(digits = 3)
+options(knitr.duplicate.label = "allow")
+```
+
+`r if(knitr::opts_knit$get("rmarkdown.pandoc.to") == 'gfm-yaml_metadata_block') 'Versión HTML (más legible e interactiva), [aquí](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)'`
+
+`r if(knitr::opts_knit$get("rmarkdown.pandoc.to") == 'latex') 'Versión HTML (quizá más legible), [aquí](https://geofis.github.io/manaties-rd/fuentes-geoespaciales.html)'`
+
+# Introducción
+
+El hábitat es un determinante fundamental para la supervivencia y prosperidad de cualquier especie animal. En el caso de los manatíes, animales acuáticos sumamente vulnerables, la preservación de su hábitat es crítica para su supervivencia. Sin embargo, la evaluación precisa del hábitat de los manatíes plantea retos debido a la falta de un marco analítico sistemático y a la carencia de herramientas adecuadas para tal fin.
+
+En este estudio, abordamos estos desafíos mediante la aplicación del Proceso Analítico Jerárquico (AHP, por sus siglas en inglés) y técnicas geoespaciales para el análisis de idoneidad del hábitat para manatíes [@saaty2001; @saaty2007; @saaty1977]. El AHP es una técnica multicriterio que facilita la toma de decisiones en situaciones complejas, permitiendo la descomposición de un problema en un sistema de jerarquías. En el ámbito de la conservación de la vida silvestre, esta técnica puede ser invaluable para evaluar y priorizar áreas de hábitat basándose en diversos factores que contribuyen a la idoneidad del hábitat.
+
+Además, las técnicas geoespaciales, como los Sistemas de Información Geográfica (SIG) y el Análisis Espacial, permiten la representación visual y la manipulación de los datos de ubicación. Estas técnicas, combinadas con el AHP, proporcionan un enfoque potente para la evaluación de la idoneidad del hábitat de los manatíes.
+
+En resumen, este estudio busca proporcionar un marco integral y metodológicamente sólido para la evaluación de la idoneidad del hábitat de los manatíes. Con la adopción de herramientas sencillas y accesibles, como QGIS, y la incorporación de técnicas avanzadas como el AHP y el análisis espacial, esperamos que esta investigación contribuya significativamente al campo de la conservación de manatíes y a la gestión efectiva de sus hábitats.
+
+# Materiales, métodos y resultados
+
+## Paquetes y funciones
+
+```{r}
+library(terra)
+library(sf)
+library(kableExtra)
+library(tidyverse)
+library(gdalUtilities)
+library(rgrass)
+estilo_kable <- function(df, titulo = '', cubre_anchura = T) {
+  df %>% kable(format = 'html', escape = F, booktabs = T, digits = 2, caption = titulo) %>%
+  kable_styling(bootstrap_options = c("hover", "condensed"), full_width = cubre_anchura)
+}
+grass_flags <- c('overwrite', 'quiet')
+ruta_fuentes <- 'fuentes/MAPA 1_HABITAT OPTIMO/'
+```
+
+## Preparación de los datos base
+
+Primero extraemos, reproyectamos y remuestreamos (reducimos resolución, de 10 a 100 m) la capa de batimetría a UTM con GDAL [@gdal2022gdal]. Luego borramos la fuente detallada (la de 10 m).
+
+```{r}
+ruta_bat <- paste0(ruta_fuentes, 'BatimetriaSRC.tif')
+ruta_bat_utm <- paste0(ruta_fuentes, 'BatimetriaSRC_32619.tif')
+```
+
+
+```{r, eval = F}
+unzip(
+  zipfile = paste0(ruta_fuentes, 'BatimetriaSRC.zip'),
+  exdir = ruta_fuentes, junkpaths = T,
+  unzip = '/usr/bin/unzip')
+gdalwarp(
+  srcfile = ruta_bat,
+  dstfile = ruta_bat_utm,
+  t_srs = 'EPSG:32619', # CRS de destino
+  tr = c(100, 100), # Resolución de destino
+  tap = TRUE, # Alinear a la cuadricula
+  r = 'med', # Remuestreo por medio de mediana
+  overwrite = T)
+file.remove(ruta_bat)
+```
+
+Cargamos la capa a `R` como `SpatRast`.
+
+```{r}
+bat <- rast(ruta_bat_utm)
+plot(bat)
+```
+
+> IMPORTANTE. Ejecutar estas líneas SÓLO para cerrar la sesión de GRASS de forma apropiada. Útil al final del día, o antes de cerrar R. No es obligatorio hacerlo, más bien, es buena práctica.
+
+```{r, eval=F}
+unlink_.gislock()
+```
+
+## Creación de base de datos GRASS GIS (GISDBASE/LOCATION/MAPSET)
+
+Creamos la base de datos de GRASS GIS, con localización y conjunto de mapas incluido, usando la extensión y resolución de la capa de batimetría como base de definición [@GRASS_GIS_software].
+
+```{r}
+gisdbase <- 'bdgrass' #Base de datos de GRASS GIS
+wd <- getwd() #Directorio de trabajo
+wd
+loc <- initGRASS(gisBase = "/usr/lib/grass82",
+                 home = wd,
+                 SG = bat,
+                 gisDbase = paste(wd, gisdbase, sep = '/'),
+                 location = 'rd',
+                 mapset = "PERMANENT",
+                 override = TRUE)
+gmeta(g.proj_WKT = F) # Imprime información sobre la región activa de GRASS GIS
+```
+
+## Importar fuentes a GRASS GIS
+
+### Capa de batimetría
+
+Importamos el ráster con `r.import`.
+
+```{r, eval=F}
+# system('r.import --help') # Ayuda sobre la función
+execGRASS(
+  cmd = 'r.import',
+  flags = grass_flags,
+  input = ruta_bat_utm,
+  output = 'batimetria')
+```
+
+Fijar máscara.
+
+```{r, eval=F}
+execGRASS(
+  cmd = 'r.mask',
+  flags = grass_flags,
+  raster = 'batimetria')
+system('g.list type=rast')
+```
+
+Representar, trayendo capa desde GRASS.
+
+```{r}
+bat_g <- read_RAST('batimetria', flags = grass_flags)
+plot(bat_g)
+```
+
+
+### Capa de praderas
+
+Extraer de ZIP.
+
+```{r}
+ruta_prad <- paste0(ruta_fuentes, 'PraderasSRC.shp')
+ruta_prad_utm <- paste0(ruta_fuentes, 'PraderasSRC_32619.gpkg')
+```
+
+
+```{r, eval = F}
+unzip(
+  zipfile = paste0(ruta_fuentes, 'PraderasSRC.zip'),
+  exdir = ruta_fuentes, junkpaths = T,
+  unzip = '/usr/bin/unzip')
+ogr2ogr(
+  src_datasource_name = ruta_prad,
+  dst_datasource_name = ruta_prad_utm,
+  s_srs = 'EPSG:4326', # CRS de origen
+  t_srs = 'EPSG:32619', # CRS de destino
+  f = 'GPKG',
+  nlt = 'MULTIPOLYGON',
+  overwrite = T)
+file.remove(ruta_prad)
+```
+
+Importar a GRASS GIS.
+
+```{r, eval=F}
+system('v.import --help')
+execGRASS(
+  cmd = 'v.import',
+  flags = grass_flags,
+  input = ruta_prad_utm,
+  output = 'praderas')
+```
+
+Convertir a ráster.
+
+```{r}
+system('v.to.rast --help')
+execGRASS(
+  cmd = 'v.to.rast',
+  flags = grass_flags,
+  input = 'praderas',
+  output = 'praderas',
+  use = 'cat')
+```
+
+```{r}
+prad_g <- read_RAST('praderas', flags = grass_flags)
+plot(prad_g)
+```
+
+
+## Cierre de la sesión de GRASS GIS
+
+```{r}
+unlink_.gislock()
+```
+
+# Referencias
