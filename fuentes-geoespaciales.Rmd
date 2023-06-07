@@ -353,7 +353,7 @@ execGRASS(
   cmd = 'r.import',
   flags = grass_flags,
   input = ruta_mang,
-  output = 'manglares_GMWU',
+  output = 'manglares',
   extent = 'region',
   resolution = 'region')
 ```
@@ -361,8 +361,62 @@ execGRASS(
 Representar, trayendo capa desde GRASS.
 
 ```{r}
-mang_g <- read_RAST('manglares_GMWU', flags = grass_flags)
+mang_g <- read_RAST('manglares', flags = grass_flags)
 plot(mang_g)
+```
+
+## Generar fuentes derivadas
+
+### Distancia a praderas
+
+```{r, eval=F}
+# system('r.grow.distance --help') # Ayuda sobre la función
+execGRASS(
+  cmd = 'r.grow.distance',
+  flags = grass_flags,
+  input = 'praderas',
+  distance = 'praderas_distancias')
+```
+
+Representar, trayendo capa desde GRASS.
+
+```{r}
+prad_d_g <- read_RAST('praderas_distancias', flags = grass_flags)
+plot(prad_d_g)
+```
+
+### Distancia a estuarios
+
+```{r, eval=F}
+execGRASS(
+  cmd = 'r.grow.distance',
+  flags = grass_flags,
+  input = 'estuarios',
+  distance = 'estuarios_distancias')
+```
+
+Representar, trayendo capa desde GRASS.
+
+```{r}
+estu_d_g <- read_RAST('estuarios_distancias', flags = grass_flags)
+plot(estu_d_g)
+```
+
+### Distancia a manglares
+
+```{r, eval=F}
+execGRASS(
+  cmd = 'r.grow.distance',
+  flags = grass_flags,
+  input = 'manglares',
+  distance = 'manglares_distancias')
+```
+
+Representar, trayendo capa desde GRASS.
+
+```{r}
+mang_d_g <- read_RAST('manglares_distancias', flags = grass_flags)
+plot(mang_d_g)
 ```
 
 ## Cierre de la sesión de GRASS GIS
