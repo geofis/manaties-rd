@@ -52,6 +52,8 @@ En resumen, este estudio busca proporcionar un marco integral y metodológicamen
 
 ## Paquetes y funciones
 
+Esta parte del código es reaprovechable. Gran parte del código posterior depende de ella.
+
 ```{r}
 library(terra)
 library(sf)
@@ -66,6 +68,23 @@ estilo_kable <- function(df, titulo = '', cubre_anchura = T) {
 grass_flags <- c('overwrite', 'quiet')
 ruta_fuentes <- 'fuentes/MAPA 1_HABITAT OPTIMO/'
 ```
+
+También reaprovechable: reabrir la región de GRASS GIS
+
+```{r}
+gisdbase <- 'bdgrass' #Base de datos de GRASS GIS
+wd <- getwd() #Directorio de trabajo
+wd
+loc <- initGRASS(gisBase = "/usr/lib/grass82",
+                 home = wd,
+                 SG = bat,
+                 gisDbase = paste(wd, gisdbase, sep = '/'),
+                 location = 'rd',
+                 mapset = "PERMANENT",
+                 override = TRUE)
+gmeta(g.proj_WKT = F) # Imprime información sobre la región activa de GRASS GIS
+```
+
 
 ## Preparación de los datos base
 
@@ -90,7 +109,7 @@ gdalwarp(
   tap = TRUE, # Alinear a la cuadricula
   r = 'med', # Remuestreo por medio de mediana
   overwrite = T)
-file.remove(ruta_bat)
+# file.remove(ruta_bat)
 ```
 
 Cargamos la capa a `R` como `SpatRast`.
@@ -180,7 +199,7 @@ ogr2ogr(
   f = 'GPKG',
   nlt = 'MULTIPOLYGON',
   overwrite = T)
-file.remove(ruta_prad)
+# file.remove(paste0(gsub('.shp', '.', ruta_prad), c('dbf', 'prj', 'shp', 'shx')))
 ```
 
 Importar a GRASS GIS.
@@ -196,7 +215,7 @@ execGRASS(
 
 Convertir a ráster.
 
-```{r}
+```{r, eval = F}
 system('v.to.rast --help')
 execGRASS(
   cmd = 'v.to.rast',
@@ -211,6 +230,140 @@ prad_g <- read_RAST('praderas', flags = grass_flags)
 plot(prad_g)
 ```
 
+### Capa de estuarios
+
+Extraer de ZIP.
+
+```{r}
+ruta_estu <- paste0(ruta_fuentes, 'EstuariosSRC.shp')
+ruta_estu_utm <- paste0(ruta_fuentes, 'EstuariosSRC_32619.gpkg')
+```
+
+
+```{r, eval = F}
+unzip(
+  zipfile = paste0(ruta_fuentes, 'EstuariosSRC.zip'),
+  exdir = ruta_fuentes, junkpaths = T,
+  unzip = '/usr/bin/unzip')
+ogr2ogr(
+  src_datasource_name = ruta_estu,
+  dst_datasource_name = ruta_estu_utm,
+  s_srs = 'EPSG:4326', # CRS de origen
+  t_srs = 'EPSG:32619', # CRS de destino
+  f = 'GPKG',
+  nlt = 'MULTIPOLYGON',
+  overwrite = T)
+# file.remove(paste0(gsub('.shp', '.', ruta_estu), c('cpg', 'dbf', 'prj', 'shp', 'shx')))
+```
+
+Importar a GRASS GIS.
+
+```{r, eval=F}
+system('v.import --help')
+execGRASS(
+  cmd = 'v.import',
+  flags = grass_flags,
+  input = ruta_estu_utm,
+  output = 'estuarios')
+```
+
+Convertir a ráster.
+
+```{r, eval = F}
+system('v.to.rast --help')
+execGRASS(
+  cmd = 'v.to.rast',
+  flags = grass_flags,
+  input = 'estuarios',
+  output = 'estuarios',
+  use = 'val')
+```
+
+```{r}
+estu_g <- read_RAST('estuarios', flags = grass_flags)
+plot(estu_g)
+```
+
+### Capa de lagunas costeras
+
+Extraer de ZIP.
+
+```{r}
+ruta_lagu <- paste0(ruta_fuentes, 'LagunasCosterasSRC.shp')
+ruta_lagu_utm <- paste0(ruta_fuentes, 'LagunasCosterasSRC_32619.gpkg')
+```
+
+
+```{r, eval = F}
+unzip(
+  zipfile = paste0(ruta_fuentes, 'LagunasCosterasSRC.zip'),
+  exdir = ruta_fuentes, junkpaths = T,
+  unzip = '/usr/bin/unzip')
+ogr2ogr(
+  src_datasource_name = ruta_lagu,
+  dst_datasource_name = ruta_lagu_utm,
+  s_srs = 'EPSG:4326', # CRS de origen
+  t_srs = 'EPSG:32619', # CRS de destino
+  f = 'GPKG',
+  nlt = 'MULTIPOLYGON',
+  overwrite = T)
+# file.remove(paste0(gsub('.shp', '.', ruta_lagu), c('cpg', 'dbf', 'prj', 'shp', 'shx')))
+```
+
+Importar a GRASS GIS.
+
+```{r, eval=F}
+system('v.import --help')
+execGRASS(
+  cmd = 'v.import',
+  flags = grass_flags,
+  input = ruta_lagu_utm,
+  output = 'lagunas_costeras')
+```
+
+Convertir a ráster.
+
+```{r, eval = F}
+system('v.to.rast --help')
+execGRASS(
+  cmd = 'v.to.rast',
+  flags = grass_flags,
+  input = 'lagunas_costeras',
+  output = 'lagunas_costeras',
+  use = 'val')
+```
+
+```{r}
+lagu_g <- read_RAST('lagunas_costeras', flags = grass_flags)
+plot(lagu_g)
+```
+
+### Capa de manglares
+
+```{r}
+ruta_mang <- paste0(ruta_fuentes, '../MASCARAS GENERADAS POR JR/global_mangrove_watch_union.tif')
+ruta_mang_utm <- paste0(ruta_fuentes, '../MASCARAS GENERADAS POR JR/global_mangrove_watch_union_32619.tif')
+```
+
+Importamos el ráster con `r.import`.
+
+```{r, eval=F}
+# system('r.import --help') # Ayuda sobre la función
+execGRASS(
+  cmd = 'r.import',
+  flags = grass_flags,
+  input = ruta_mang,
+  output = 'manglares_GMWU',
+  extent = 'region',
+  resolution = 'region')
+```
+
+Representar, trayendo capa desde GRASS.
+
+```{r}
+mang_g <- read_RAST('manglares_GMWU', flags = grass_flags)
+plot(mang_g)
+```
 
 ## Cierre de la sesión de GRASS GIS
 
